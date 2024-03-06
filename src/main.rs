@@ -16,14 +16,18 @@ use std::thread;
 
 struct Handler;
 
+/*
+Write {content} out to test.typ and compile to png. Returns an option, None if writing was successful, and the
+String with the compilation error if unsuccessful
+*/
 fn writeOut(content: &str) -> Option<String> {
     let data = format!(
         "
-        #import \"@preview/physica:0.9.2\" : *
-        #set page(width: auto, height: auto, margin: .1em, fill: rgb(49, 51,56 ,255))
-        #set text(size: 24pt, fill: white)
+#import \"@preview/physica:0.9.2\" : *
+#set page(width: auto, height: auto, margin: .1em, fill: rgb(49, 51,56 ,255))
+#set text(size: 24pt, fill: white)
 
-        $ {content} $  
+$ {content} $  
     "
     );
     fs::write("./test.typ", data).expect("Unable to write file");
@@ -42,6 +46,9 @@ fn writeOut(content: &str) -> Option<String> {
     }
 }
 
+/*
+Send {body} to {chid} (channel id)
+*/
 async fn sendMessage(ctx: Context, body: &str, chid: ChannelId) {
     let a = writeOut(body);
     let builder: CreateMessage;
@@ -60,6 +67,10 @@ async fn sendMessage(ctx: Context, body: &str, chid: ChannelId) {
 
 #[async_trait]
 impl EventHandler for Handler {
+    /*
+    Send new message upon a message being edited
+    TODO: Keep track of already sent messages and edit the corresponding one rather than sending a whole new one
+     */
     async fn message_update(
         &self,
         ctx: Context,
@@ -77,26 +88,15 @@ impl EventHandler for Handler {
         }
     }
 
+    /*
+    Send message with typst png if message starts with ?math
+     */
     async fn message(&self, ctx: Context, msg: Message) {
         if msg.content.starts_with("?math") {
             let body: Vec<&str> = msg.content.split("?math ").collect();
             if (body.len() == 2) {
                 println!("Math message sent: {}", body[1]);
                 sendMessage(ctx, body[1], msg.channel_id).await;
-                // match msg {
-                //     Ok(mut msg) => {
-                //         let ten_millis = time::Duration::from_millis(2000);
-                //         thread::sleep(ten_millis);
-                //         writeOut("c");
-                //         let builder2 = EditMessage::new()
-                //             .remove_all_attachments()
-                //             .new_attachment(CreateAttachment::path("./out.png").await.unwrap());
-                //         msg.edit(ctx, builder2).await;
-                //     }
-                //     Err(msg) => {}
-                // }
-
-                //return
             }
         }
     }
@@ -117,6 +117,9 @@ async fn main() {
         .event_handler(Handler)
         .await
         .expect("Err creating client");
+
+    // other approach, have thread watch for faster compilation
+    // has issue of not knowing when compilation is finished
 
     // thread::spawn(move || {
     //     let mut typst = Command::new("typst");
